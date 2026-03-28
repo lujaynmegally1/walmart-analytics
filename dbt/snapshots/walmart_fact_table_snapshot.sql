@@ -18,6 +18,13 @@
        'markdown5']
    )
 }}
+
+   -- SCD Type 2 — Versioned history via dbt snapshot
+-- When any check_col changes for a (store_id, dept_id, store_date) combo:
+--   1. The existing row is "closed" (dbt_valid_to is set to current timestamp)
+--   2. A new row is inserted with dbt_valid_from = current timestamp, dbt_valid_to = NULL
+-- dbt_valid_to IS NULL = current/active record
+ 
 WITH source AS (
    SELECT
        f.store_date,

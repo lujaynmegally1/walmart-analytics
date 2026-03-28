@@ -1,7 +1,5 @@
 # Walmart BI Analytics — Data Engineering Project
 
-![Architecture](architecture-diagram.png)
-
 **Stack:** Snowflake · dbt · Tableau · Python (Matplotlib / Plotly / Seaborn)
 
 ---
@@ -29,6 +27,7 @@ This project performs end-to-end data engineering and business intelligence anal
 ---
 
 ## 2. Architecture
+![Architecture](architecture-diagram.png) 
 
 ```
 S3 Bucket (walmart-bi-dea)
@@ -55,8 +54,6 @@ dbt Snapshot (SNAPSHOTS schema)
         ├──► Tableau Desktop (Dashboards)
         └──► Python (Matplotlib / Plotly / Seaborn charts)
 ```
-
-See [`architecture-diagram.png`](architecture-diagram.png) for the visual diagram.
 
 ---
 
@@ -137,6 +134,7 @@ Run [`snowflake/setup.sql`](snowflake/setup.sql) in order:
 4. Creates the external stage and CSV file format
 
 ### Step 3 — dbt Setup
+[/dbt](dbt)
 1. Connect dbt Cloud to your Snowflake account
 2. Set your dbt project to use the `dbt/` folder as the models directory
 3. Run in order:
@@ -270,27 +268,3 @@ Charts cover:
 - Fuel Price by Year
 - Weekly Sales by Year / Month / Date
 - Department-wise Weekly Sales
-
----
-
-## 10. Known Issues & Questions for Coaches
-
-### Data Quality Issues
-- **Duplicate rows in `department.csv`:** The department CSV contains many duplicate `(store_id, store_date)` rows. This caused issues testing SCD logic — because no true "new" versions of the data exist, incremental/snapshot runs after the first don't update meaningfully.
-- **Fact table duplicate combinations:** The fact table has hundreds of duplicate rows for the same `(store_id, dept_id, store_date)` key, which complicates SCD2 versioning.
-
-### SCD Logic Questions
-1. Since the source data doesn't actually change between runs, is the SCD1/SCD2 logic **hypothetical** (demonstrating the pattern) or were we expected to simulate data changes?
-2. For the **SCD1 `merge` strategy in dbt** — is the upsert logic happening automatically via Snowflake's `MERGE` statement under the hood, or is additional logic needed?
-3. For **SCD2 with the `snapshot`** — when a change is detected in `weekly_sales`, it seems to version out records for all rows sharing the same `store_id` and `store_date`, not just the changed row. Is this expected behavior or a configuration issue?
-4. The second run of the dimension tables takes 20+ minutes and doesn't complete. Is this a warehouse size issue, or is there a problem with the incremental filter logic?
-
-### Performance Issues
-- Joining all 3 tables in Python (full data) generated billions of rows and took 24+ hours — had to cancel. Resolved by: creating a reduced gold table in Snowflake (`WALMART_JOINED_REDUCED`) using row-number deduplication and store-size filtering, then pulling that into pandas.
-- **Question:** How do data engineers typically handle this at scale — do they always sample, use Spark, or pre-aggregate in the warehouse before pulling to Python?
-
-### Tableau vs Python
-- Tableau handled the large join with no performance issues. **Question:** Is Tableau joining the tables in the warehouse (pushdown) or locally? How does it handle this so much faster than pandas?
-
-### dbt Schema YML
-- Is the `schema.yml` file required for the project to be valid, or is it optional/best practice?

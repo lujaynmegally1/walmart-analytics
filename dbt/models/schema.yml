@@ -1,13 +1,85 @@
 version: 2
+
 models:
- - name: walmart_date_dim
-   columns:
-     - name: store_id
-       tests:
-         - not_null
-     - name: date_id
-       tests:
-         - not_null
-         - unique
-     - name: insert_date
-     - name: update_date
+  - name: walmart_date_dim
+    description: "Date dimension table (SCD Type 1). One row per unique store date."
+    columns:
+      - name: date_id
+        description: "Surrogate key derived from store_date (YYYYMMDD format as INT)"
+        tests:
+          - not_null
+          - unique
+      - name: store_date
+        description: "Calendar date of the store record"
+        tests:
+          - not_null
+      - name: isholiday
+        description: "Whether the week contains a holiday (True/False)"
+      - name: insert_date
+        description: "Timestamp when the record was first inserted"
+      - name: update_date
+        description: "Timestamp when the record was last updated"
+
+  - name: walmart_store_dim
+    description: "Store dimension table (SCD Type 1). One row per (store_id, dept_id) combination."
+    columns:
+      - name: store_id
+        description: "Store identifier"
+        tests:
+          - not_null
+      - name: dept_id
+        description: "Department identifier"
+        tests:
+          - not_null
+      - name: store_type
+        description: "Type classification of the store (A, B, C)"
+      - name: store_size
+        description: "Physical size of the store in square feet"
+      - name: insert_date
+        description: "Timestamp when the record was first inserted"
+      - name: update_date
+        description: "Timestamp when the record was last updated"
+
+  - name: walmart_fact_table
+    description: "Fact table (SCD Type 2 via snapshot). Contains current records only (vrsn_end_date IS NULL)."
+    columns:
+      - name: store_id
+        description: "Foreign key to walmart_store_dim"
+        tests:
+          - not_null
+      - name: dept_id
+        description: "Foreign key to walmart_store_dim"
+        tests:
+          - not_null
+      - name: store_date
+        description: "Foreign key to walmart_date_dim"
+        tests:
+          - not_null
+      - name: store_weekly_sales
+        description: "Weekly sales amount for the store/department/date"
+      - name: fuel_price
+        description: "Regional fuel price for the week"
+      - name: store_temperature
+        description: "Average regional temperature for the week"
+      - name: unemployment
+        description: "Regional unemployment rate"
+      - name: cpi
+        description: "Consumer Price Index"
+      - name: markdown1
+        description: "Promotional markdown amount 1"
+      - name: markdown2
+        description: "Promotional markdown amount 2"
+      - name: markdown3
+        description: "Promotional markdown amount 3"
+      - name: markdown4
+        description: "Promotional markdown amount 4"
+      - name: markdown5
+        description: "Promotional markdown amount 5"
+      - name: vrsn_start_date
+        description: "SCD2 version start timestamp (from dbt snapshot dbt_valid_from)"
+      - name: vrsn_end_date
+        description: "SCD2 version end timestamp (NULL = current active record)"
+      - name: insert_date
+        description: "Timestamp when the record was first inserted"
+      - name: update_date
+        description: "Timestamp when the record was last updated"

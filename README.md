@@ -2,7 +2,6 @@
 
 ![Architecture](architecture-diagram.png)
 
-
 **Stack:** Snowflake · dbt · Tableau · Python (Matplotlib / Plotly / Seaborn)
 
 ---
@@ -57,7 +56,7 @@ dbt Snapshot (SNAPSHOTS schema)
         └──► Python (Matplotlib / Plotly / Seaborn charts)
 ```
 
-See `architecture-diagram.png` for the visual diagram.
+See [`architecture-diagram.png`](architecture-diagram.png) for the visual diagram.
 
 ---
 
@@ -87,7 +86,10 @@ walmart-analytics/
 │   └── stores.csv
 │
 ├── snowflake/
-│   └── setup.sql                         # Storage integration, stage, file format setup
+│   ├── setup.sql                         # Storage integration, stage, file format, grants
+│   └── filter-data-for-local-python-querying.sql  # Gold layer: pre-joined reduced table for pandas
+│
+├── Tableau-visualizations.md             # Tableau dashboard screenshots with labels
 │
 ├── dbt/
 │   ├── models/
@@ -128,7 +130,7 @@ walmart-analytics/
 3. Set placeholder external ID `0000` in the trust relationship (update after Step 2)
 
 ### Step 2 — Snowflake Storage Integration
-Run `snowflake/setup.sql` in order:
+Run [`snowflake/setup.sql`](snowflake/setup.sql) in order:
 1. Creates the `WALMART` database
 2. Creates the storage integration `SNOWFLAKE_WALMART_S3_INT`
 3. Run `DESC INTEGRATION SNOWFLAKE_WALMART_S3_INT` — copy `STORAGE_AWS_EXTERNAL_ID` and `STORAGE_AWS_IAM_USER_ARN` back into the IAM trust relationship in AWS
@@ -151,7 +153,7 @@ Run `snowflake/setup.sql` in order:
 pip install snowflake-sqlalchemy pandas matplotlib plotly seaborn
 python python/visualizations.py
 ```
-> ⚠️ The full 3-table join is very large. The script uses the pre-joined `WALMART.PUBLIC_GOLD.WALMART_JOINED_REDUCED` table for performance. See the gold layer setup in `snowflake/setup.sql`.
+> ⚠️ The full 3-table join is very large. The script uses the pre-joined `WALMART.PUBLIC_GOLD.WALMART_JOINED_REDUCED` table for performance. Run [`snowflake/filter-data-for-local-python-querying.sql`](snowflake/filter-data-for-local-python-querying.sql) in Snowflake first to create this table.
 
 ### Step 5 — Tableau
 1. Open Tableau Desktop → Connect to Snowflake
@@ -167,33 +169,33 @@ Reads directly from the Snowflake external stage (S3) and materializes as tables
 
 | Model | Source File | Key Columns |
 |---|---|---|
-| `department_raw` | department.csv | store_id, dept_id, store_date, weekly_sales, isholiday |
-| `fact_raw` | fact.csv | store_id, store_date, temperature, fuel_price, markdowns, cpi, unemployment |
-| `stores_raw` | stores.csv | store_id, store_type, store_size |
+| [`department_raw`](dbt/models/raw/department_raw.sql) | [department.csv](source-data/department.csv) | store_id, dept_id, store_date, weekly_sales, isholiday |
+| [`fact_raw`](dbt/models/raw/fact_raw.sql) | [fact.csv](source-data/fact.csv) | store_id, store_date, temperature, fuel_price, markdowns, cpi, unemployment |
+| [`stores_raw`](dbt/models/raw/stores_raw.sql) | [stores.csv](source-data/stores.csv) | store_id, store_type, store_size |
 
 ### Dimension Layer (`models/dimensions/`) — SCD1
 
 Both dimension models use `materialized='incremental'` with `incremental_strategy='merge'`. This means on the first run they create the table; on subsequent runs they **upsert** (insert new rows or update existing rows based on the unique key). History is **not** preserved — only the latest value is kept.
 
-**`walmart_date_dim`**
+**[`walmart_date_dim`](dbt/models/dimensions/walmart_date_dim.sql)**
 - Unique key: `date_id` (derived as `TO_CHAR(store_date, 'YYYYMMDD')::INT`)
 - Source: `department_raw`
 - Tracks: date, isholiday flag
 
-**`walmart_store_dim`**
+**[`walmart_store_dim`](dbt/models/dimensions/walmart_store_dim.sql)**
 - Unique key: `(store_id, dept_id)` composite
 - Source: join of `stores_raw` + `department_raw`
 - Tracks: store type, store size
 
 ### Snapshot Layer (`snapshots/`) — SCD2
 
-`walmart_fact_table_snapshot` uses dbt's `snapshot` feature with `strategy='check'`. It monitors a set of measure columns and when any value changes for a given `(store_id, dept_id, store_date)` combination, it **closes** the old record (sets `dbt_valid_to`) and **inserts** a new version. This preserves full history.
+[`walmart_fact_table_snapshot`](dbt/snapshots/walmart_fact_table_snapshot.sql) uses dbt's `snapshot` feature with `strategy='check'`. It monitors a set of measure columns and when any value changes for a given `(store_id, dept_id, store_date)` combination, it **closes** the old record (sets `dbt_valid_to`) and **inserts** a new version. This preserves full history.
 
 ### Fact Layer (`models/facts/`)
 
-`walmart_fact_table` reads from the snapshot table and surfaces only **current records** (`WHERE dbt_valid_to IS NULL`), exposing `dbt_valid_from` as `vrsn_start_date` and `dbt_valid_to` as `vrsn_end_date`.
+[`walmart_fact_table`](dbt/models/facts/walmart_fact_table.sql) reads from the snapshot table and surfaces only **current records** (`WHERE dbt_valid_to IS NULL`), exposing `dbt_valid_from` as `vrsn_start_date` and `dbt_valid_to` as `vrsn_end_date`.
 
-### Schema Tests (`schema.yml`)
+### Schema Tests ([`schema.yml`](dbt/schema.yml))
 - `date_id`: not_null, unique
 - `store_id`: not_null
 
@@ -239,7 +241,7 @@ update_date                   insert_date
 
 ## 8. Python Visualizations
 
-All charts are in `python/visualizations.py`. They connect to Snowflake and pull from the pre-joined gold table `WALMART.PUBLIC_GOLD.WALMART_JOINED_REDUCED` for performance.
+All charts are in [`python/visualizations.py`](python/visualizations.py). They connect to Snowflake and pull from the pre-joined gold table `WALMART.PUBLIC_GOLD.WALMART_JOINED_REDUCED` for performance.
 
 Charts produced:
 1. Weekly Sales by Store and Holiday (stacked bar)
@@ -257,7 +259,7 @@ Charts produced:
 
 ## 9. Tableau Dashboards
 
-Tableau dashboards were built by connecting directly to Snowflake (`WALMART.PUBLIC_BRONZE`). Screenshots of all dashboards are in `data-visualization-images/`.
+Tableau dashboards were built by connecting directly to Snowflake (`WALMART.PUBLIC_BRONZE`). See [`Tableau-visualizations.md`](Tableau-visualizations.md) for all labeled dashboard screenshots.
 
 Charts cover:
 - Weekly Sales by Store & Holiday

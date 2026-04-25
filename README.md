@@ -14,7 +14,6 @@
 7. [Data Model (Dimensional Design)](#7-data-model-dimensional-design)
 8. [Python Visualizations](#8-python-visualizations)
 9. [Tableau Dashboards](#9-tableau-dashboards)
-10. [Known Issues & Questions for Coaches](#10-known-issues--questions-for-coaches)
 
 ---
 
